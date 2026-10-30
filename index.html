@@ -29,7 +29,7 @@ input[type=color]{width:40px;height:30px;border:none;background:none;padding:0}
 #levels button{padding:12px 8px;border-radius:12px;border:3px solid #dbe6ee;background:#f7fbff;font:inherit;font-size:16px;font-weight:bold;cursor:pointer;color:#1d2b22}
 #levels button.on{border-color:#ff7a1a;background:#fff1e6}
 button.add{margin-top:10px;padding:8px 14px;border-radius:10px;border:2px dashed #9bb;background:#f7fbff;font:inherit;cursor:pointer}
-select{font:inherit;padding:6px;border-radius:8px}
+select{font:inherit;padding:6px;border-radius:8px;max-width:100%;min-width:0}.card>div{min-width:0;flex:1}
 #start{display:block;width:100%;padding:18px;font:inherit;font-size:30px;font-weight:bold;color:#fff;background:#ff7a1a;border:none;border-radius:18px;box-shadow:0 6px 0 #c4520a;cursor:pointer;margin:6px 0 16px}
 #start:active{transform:translateY(4px);box-shadow:0 2px 0 #c4520a}
 .help{font-size:15px;color:#345;line-height:1.6}
@@ -41,6 +41,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
 <body>
 <div id="setup"><div class="wrap">
   <h1>💦 Splash Warriors 💦</h1>
+  <button id="start">▶ START!</button>
   <p class="sub">Add your heroes and baddies, then soak them all with water!</p>
   <section>
     <h2>🦸 Heroes</h2>
@@ -63,7 +64,6 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
     <div id="levels"></div>
     <div class="opts"><label><input type="checkbox" id="bossStart">👑 Go straight to the boss</label></div>
   </section>
-  <button id="start">▶ START!</button>
   <section class="help">
     <h2>🎮 How to play</h2>
     <b>🎮 Controllers (best on the TV):</b> <b>left stick</b> (or d-pad) to move, <b>right stick</b> to aim, <b>hold RT</b> (or A) to splash, <b>B</b> (or LB/LT) to throw a 🎈 water balloon, <b>Start</b> to pause. Plug them in and press a button. Press A on a controller here to start.<br>
