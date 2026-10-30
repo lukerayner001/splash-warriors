@@ -1290,7 +1290,7 @@ function drawMartin(e,ESP){
 
 
 /* ---------- AMELIA AND HER SPEAKER ---------- */
-const AMELIA_CLIP='';   // drop an audio data-URL or file name in here to use a real song
+const AMELIA_CLIP='amelia.mp3';   // Amelia's song (sits next to index.html)
 const SPK_R=150;
 function grooving(p){for(const e of G.enemies)if(e.spk&&e.mst==='play'&&e.state==='walk'&&dist(p.x,p.y,e.spk.x,e.spk.y)<SPK_R*(.45+.55*(e.vol||0)))return true;return false}
 function updAmelia(e,dt,sp,bd){
@@ -1332,14 +1332,21 @@ function drawAmelia(e,SP){const k=.85,al=e.flash>0?.5:1;
   if(e.shy>0){ctx.font=`bold 15px ${FONT}`;ctx.textAlign='center';ctx.fillStyle='#ff6fa8';ctx.fillText('💗',e.x+18,e.y-66+Math.sin(G.t*5)*2)}
   label(bname(e.b),e.x,e.y+36,12,'#fff')}
 /* her song: a bouncy pop loop on its own volume knob */
-let AMBUS=null,amNext=0,amStep=0,amEl=null;
+let AMBUS=null,amNext=0,amStep=0,amEl=null;const amSong={state:'idle',buf:null,src:null,off:0,t0:0,quiet:0};
 const AMTUNE={lead:[76,79,83,79,81,null,79,76,74,76,79,null,76,74,71,null,72,76,79,76,77,null,76,72,74,76,72,null,71,72,74,null],bass:[52,52,47,47,48,48,50,50]};
 function ameliaVol(){let v=0;if(G&&G.enemies)for(const e of G.enemies)if(e.spk&&e.state==='walk'&&e.mst==='play')v=Math.max(v,e.vol||0);return v}
 function ameliaTick(){if(!AC||!MASTER)return;if(!AMBUS){AMBUS=AC.createGain();AMBUS.gain.value=0;AMBUS.connect(MASTER)}
   const on=!muted&&running&&!paused&&G&&G.state!=='stats',v=on?ameliaVol():0;
   AMBUS.gain.setTargetAtTime(v*.8,AC.currentTime,.08);
-  if(AMELIA_CLIP){if(!amEl){amEl=new Audio(AMELIA_CLIP);amEl.loop=true;try{AC.createMediaElementSource(amEl).connect(AMBUS)}catch(e){}}
-    if(v>.01&&amEl.paused)amEl.play().catch(()=>{});else if(v<=.01&&!amEl.paused&&AMBUS.gain.value<.01)amEl.pause();return}
+  if(AMELIA_CLIP&&amSong.state!=='failed'){
+    if(amSong.state==='idle'){amSong.state='loading';
+      fetch(AMELIA_CLIP).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(b=>AC.decodeAudioData(b)).then(buf=>{amSong.buf=buf;amSong.state='ready'})
+        .catch(()=>{try{amEl=new Audio(AMELIA_CLIP);amEl.loop=true;amEl.volume=0;amSong.state='element'}catch(e){amSong.state='failed'}})}
+    if(amSong.state==='ready'){
+      if(v>.01&&!amSong.src){const src=AC.createBufferSource();src.buffer=amSong.buf;src.loop=true;src.connect(AMBUS);const off=amSong.off%amSong.buf.duration;src.start(0,off);amSong.src=src;amSong.t0=AC.currentTime-off;amSong.quiet=0}
+      if(amSong.src){if(v<=.01){amSong.quiet+=1/60;if(amSong.quiet>2){amSong.off=AC.currentTime-amSong.t0;try{amSong.src.stop()}catch(e){}amSong.src=null}}else amSong.quiet=0}}
+    else if(amSong.state==='element'&&amEl){amEl.volume=Math.min(1,v*.8);if(v>.01&&amEl.paused)amEl.play().catch(()=>{});else if(v<=.01&&!amEl.paused)amEl.pause()}
+    if(amSong.state!=='loading'||v<=.01)return}
   if(v<=.01){amNext=0;return}
   const now=AC.currentTime;if(amNext<now)amNext=now+.05;const spb=60/118/2;
   while(amNext<now+.2){const st=amStep%32,t=amNext-now,n=AMTUNE.lead[st];
@@ -1843,7 +1850,7 @@ function drawHUD(){
 let last=0;
 function loop(ts){const dt=Math.min(.05,(ts-last)/1000||0);last=ts;PADS=pollPads();musicTick();if(running){if(!paused)update(dt);draw()}requestAnimationFrame(loop)}
 renderSetup();requestAnimationFrame(loop);
-window.__sw={get G(){return G},cfg,shift:s=>shiftWorld(s)};
+window.__sw={get G(){return G},cfg,shift:s=>shiftWorld(s),get audio(){return {st:amSong.state,playing:!!amSong.src,el:amEl&&{paused:amEl.paused,vol:amEl.volume},gain:AMBUS&&+AMBUS.gain.value.toFixed(2)}}};
 })();
 </script>
 </body>
