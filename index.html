@@ -86,7 +86,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
 
 <script>
 (()=>{
-const W=540,H=720;
+let W=540;const H=720;
 const $=s=>document.querySelector(s);
 const cv=$('#c'),ctx=cv.getContext('2d');
 const clamp=(v,a,b)=>v<a?a:v>b?b:v, rnd=(a,b)=>a+Math.random()*(b-a), dist=(a,b,c,d)=>Math.hypot(a-c,b-d);
@@ -234,7 +234,7 @@ $('#bossStart').onchange=e=>{cfg.startBoss=e.target.checked;save();renderLevels(
 function startGame(){
   $('#start').blur();save();unlockAudio();
   try{const r=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(r&&r.catch)r.catch(()=>{})}catch(e){}
-  $('#setup').style.display='none';$('#game').style.display='flex';resize();newGame();
+  $('#setup').style.display='none';$('#game').style.display='flex';fitWidth();resize();newGame();
   const lv=clamp(cfg.startLevel||1,1,4);if(lv>1){G.level=lv;G.len=4000+500*(lv-1);G.speed=32+5*(lv-1);genDecor();genObstacles()}
   if(cfg.startBoss){G.dist=G.len;G.stateT=1.5}
   running=true;paused=false;
@@ -298,6 +298,9 @@ function toCanvas(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.le
 const PAUSE_BTN={x:W/2+82,y:23,r:16};
 const BTN_RESUME={x:W/2-140,y:H/2-20,w:280,h:64},BTN_SETUP={x:W/2-140,y:H/2+64,w:280,h:64};
 const BAL_BTN=[{x:46,y:H-66,r:30},{x:W-46,y:H-66,r:30}];
+// widen the play area to fill landscape screens (TVs/laptops); portrait phones stay 540 wide
+function fitWidth(){const a=innerWidth/Math.max(1,innerHeight);W=Math.round(clamp(H*a,540,1280)/2)*2;
+  PAUSE_BTN.x=W/2+82;BTN_RESUME.x=W/2-140;BTN_SETUP.x=W/2-140;BAL_BTN[1].x=W-46}
 const inRect=(p,b)=>p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h;
 cv.addEventListener('pointerdown',e=>{
   e.preventDefault();unlockAudio();const p=toCanvas(e);
@@ -359,7 +362,7 @@ function startX(i,n){return n===1?W/2:(i===0?W*.35:W*.65)}
 function mkPlayer(i,n){return{i,x:startX(i,n),y:H-110,dx:0,dy:-1,hearts:3,inv:2,dead:0,cool:0,power:null,powerT:0,shield:0,walk:0,moving:false,balloons:5}}
 function placeDecor(d,y){const th=theme();d.type=pick(th.decor);d.x=rnd(20,W-20);d.y=y;d.s=rnd(.8,1.25);d.rot=rnd(-.5,.5);
   d.cols=[0,1,2,3,4].map(()=>pick(['#ff6b8a','#ffd93d','#ffffff','#b48cff','#ff9f43']));d.off=[0,1,2,3,4].map(()=>[rnd(-14,14),rnd(-10,10)])}
-function genDecor(){G.decor=[];for(let k=0;k<16;k++){const d={};placeDecor(d,rnd(-100,H));G.decor.push(d)}}
+function genDecor(){G.decor=[];for(let k=0;k<Math.round(16*W/540);k++){const d={};placeDecor(d,rnd(-100,H));G.decor.push(d)}}
 const active=p=>p.dead<=0&&!p.captured&&!p.away;
 function nearest(x,y){let best=null,bd=1e9;for(const p of G.players){if(!active(p))continue;const d=dist(x,y,p.x,p.y);if(d<bd){bd=d;best=p}}return best}
 function pname(i){return(cfg.players[i]&&cfg.players[i].name)||('Player '+(i+1))}
@@ -985,7 +988,11 @@ function drawWreck(){const w=G.wreck,SP=SPRITES.heli;if(!w||!spReady(SP))return;
 const SCROLL_LINE=330,CHUNK=270;
 const HOUSE_COLS=['#f4e3c1','#dfe9f2','#f2d4d0','#e3efd9','#efe6f5'],ROOF_COLS=['#b5473a','#5d6b7a','#8a5a3c','#3f6e8c'];
 function mkHouse(x,y){return{t:'house',x,y,w:140,h:62,col:pick(HOUSE_COLS),roof:pick(ROOF_COLS),door:pick(['#7a4a2a','#2f5d8a','#a23b3b','#3c7a4a'])}}
-function genChunk(y0){if(theme().name==='The Beach')return genBeachChunk(y0);const L=[],r=Math.random();
+function genChunk(y0){if(W<900)return genChunkBase(y0);
+  const full=W,half=Math.round(W/2);W=half;const A=genChunkBase(y0),B=genChunkBase(y0);W=full;B.forEach(o=>o.x+=half);
+  let L=[...A,...B];const wide=L.filter(o=>o.t==='road'||o.t==='boardwalk');if(wide.length){L=L.filter(o=>!wide.includes(o));const r=wide[0];r.x=0;r.w=W;L.push(r)}
+  return L}
+function genChunkBase(y0){if(theme().name==='The Beach')return genBeachChunk(y0);const L=[],r=Math.random();
   if(r<.18){L.push({t:'road',x:0,y:y0+170,w:W,h:74});if(Math.random()<.7)L.push(mkHouse(Math.random()<.5?14:W-154,y0+70))}
   else if(r<.36){const gap=rnd(140,180),gx=rnd(40,W-40-gap);if(gx>24)L.push({t:'wall',x:0,y:y0+130,w:gx,h:18});if(gx+gap<W-24)L.push({t:'wall',x:gx+gap,y:y0+130,w:W-gx-gap,h:18})}
   else if(r<.52){L.push(mkHouse(12,y0+60));L.push(mkHouse(W-152,y0+150))}
