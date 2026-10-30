@@ -954,7 +954,7 @@ function updFoot(b,dt){
   b.t+=dt;b.flash=Math.max(0,b.flash-dt);b.say-=dt;
   if(b.state==='splashed'){b.y-=60*dt;b.s=Math.max(.6,b.s-dt*.3);b.t2+=dt;
     if(Math.random()<.8)G.parts.push({x:b.x+rnd(-20,20),y:b.y-rnd(0,90),vx:0,vy:60,life:.6,max:.6,r:3,col:'#5ec8ff',g:200});
-    if(b.t2>2.2&&G.state!=='win'){G.state='win';G.stateT=6;sfx('win')}return}
+    if(b.t2>2.2&&!G.won){G.won=true;G.state='win';G.stateT=6;sfx('win')}return}
   if(b.state==='jump'||b.state==='fight'){
     if(b.state==='fight'&&(b.pause||0)>0){b.pause-=dt;b.moving=false}
     else{const dx=b.tx-b.x,dy=b.ty-b.y,d=Math.hypot(dx,dy),spd=b.state==='jump'?170:110+G.level*10;
@@ -1358,7 +1358,7 @@ function updBoss(b,dt){
   if(b.state==='enter'){b.y+=70*dt;if(b.y>=215){b.y=215;b.state='fight'}return}
   if(b.state==='splashed'){b.y-=50*dt;b.s=Math.max(.6,b.s-dt*.4);b.t2+=dt;
     if(Math.random()<.8)G.parts.push({x:b.x+rnd(-30,30),y:b.y-rnd(0,60),vx:0,vy:60,life:.6,max:.6,r:3.5,col:'#5ec8ff',g:200});
-    if(b.t2>2.2&&G.state!=='win'){G.state='win';G.stateT=6;sfx('win')}return}
+    if(b.t2>2.2&&!G.won){G.won=true;G.state='win';G.stateT=6;sfx('win')}return}
   b.x+=b.vx*dt;if(b.x<90){b.x=90;b.vx=Math.abs(b.vx)}if(b.x>W-90){b.x=W-90;b.vx=-Math.abs(b.vx)}
   b.y=215+Math.sin(b.t*.9)*40;
   b.sayT-=dt;if(b.sayT<=0){b.sayT=rnd(4,7);b.say=2.2}
@@ -1373,6 +1373,7 @@ function hitBoss(s){const b=G.boss;b.hp--;b.flash=.08;addScore(5);burst(s.x,s.y,
   if(b.hp<=0){creditKill(bname(b.b)+' (boss)');b.state='splashed';b.t2=0;addScore(1000);G.shake=1;burst(b.x,b.y-30,'#5ec8ff',60,320);sfx('splash');
     txt(b.x,b.y-110,'MEGA SPLASH!','#ffd93d',34);G.foe=[];G.bombs=[];for(const e of G.enemies)if(e.state==='walk')splashEnemy(e,true)}}
 function nextLevel(){
+  G.won=false;
   G.stats=[newStats(),newStats()];
   G.van=null;G.vanT=rnd(18,28);G.bath=null;G.bathT=rnd(32,42);G.players.forEach(p=>{p.captured=false;p.away=false;p.carried=false;p.inBath=false});
   G.level++;G.dist=0;G.len+=500;G.speed+=5;G.boss=null;G.enemies=[];G.foe=[];G.pickups=[];G.lobs=[];G.bombs=[];G.pools=[];G.prints=[];G.poos=[];G.wreck=null;G.state='intro';G.stateT=3.2;
