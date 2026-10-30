@@ -71,7 +71,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
     <b>🚁 George's helicopter:</b> pick George as the final boss. He fires blue Nerf darts from his minigun and drops bombs that count down 5…4…3…2…1…BOOM! Run out of the red circle, or splash a bomb 3 times to fizzle it out. Crash the helicopter and George jumps out for <b>round 2</b> on foot, throwing grenades that go off after 3 seconds.<br>
     <b>🗺️ Exploring:</b> the screen only moves forward when a hero walks up. Walls, houses and hedges block your way (and your water!), so go round them or hide behind them. Sand pits slow you down. Uncle Luke leaves growing pools of blood when he stands still, and they slow you down too. On the beach it's boats, windbreaks, kayaks, paddleboards, parasols, deckchairs, sun loungers and fishing rods to dodge, and rock pools slow you down.<br>
     <b>🍰 Nanny Chickens:</b> throws cake and coleslaw at you! Splash the food out of the air. Coleslaw leaves a slippy mess that slows you down.<br>
-    <b>👷 Martin the builder:</b> walks to spots in your way and builds things: holes to go round, wet concrete that slows you down (and leaves grey footprints), sheds and lamp posts. Splash him before he finishes! Josie puts her hi-vis on to help him, which makes him build faster.<br>
+    <b>👷 Martin the builder:</b> walks to spots in your way and builds things: holes to go round, wet concrete that slows you down (and leaves grey footprints), sheds and twinkly LED garden lights. Splash him before he finishes! Josie puts her hi-vis on to help him, which makes him build faster.<br>
     <b>🛁 Bath baddies:</b> tick "Rolls in a bath" and that baddie pushes a bath around. Anyone it rolls into gets a 10-second bubble bath (and comes out squeaky clean with a bubble shield). Splash her to stop the bath early!<br>
     <b>🚐 Van baddies:</b> tick "Comes in a van" and that baddie drives in, jumps out and chases the heroes. If he catches one he carries them to the van and drives off for 10 seconds! Splash him to make him drop them.<br>
     <b>Special baddies:</b> tick 🍬 to make a baddie throw sweets the heroes can catch (🍫 = extra heart, 🍬🍭 = sugar rush!). Give them a dog's name and their dog follows them around (and sometimes licks their toes).<br>
@@ -867,10 +867,10 @@ function genChunk(y0){if(theme().name==='The Beach')return genBeachChunk(y0);con
 function genObstacles(){G.obs=[];G.obsTop=H-300;while(G.obsTop>-320){G.obsTop-=CHUNK;G.obs.push(...genChunk(G.obsTop))}}
 const isSolid=o=>o.t==='wall'||o.t==='house'||o.t==='hedge'||o.t==='hole'||o.t==='shed'||o.t==='lamp'||BEACH_SOLID.includes(o.t);
 function solidBox(o){return o.t==='house'?{x:o.x,y:o.y-42,w:o.w,h:o.h+42}:{x:o.x,y:o.y,w:o.w,h:o.h}}
-function visBox(o){if(o.t==='shed')return{x:o.x,y:o.y-46,w:o.w,h:o.h+46};if(o.t==='lamp')return{x:o.x,y:o.y-66,w:o.w,h:o.h+66};if(BEACH_VH[o.t]!=null)return{x:o.x,y:o.y-BEACH_VH[o.t],w:o.w,h:o.h+BEACH_VH[o.t]};return o.t==='house'?{x:o.x-6,y:o.y-64,w:o.w+12,h:o.h+64}:o.t==='wall'?{x:o.x,y:o.y-24,w:o.w,h:o.h+24}:{x:o.x,y:o.y-14,w:o.w,h:o.h+14}}
+function visBox(o){if(o.t==='shed')return{x:o.x,y:o.y-46,w:o.w,h:o.h+46};if(o.t==='lamp')return{x:o.x,y:o.y-30,w:o.w,h:o.h+30};if(BEACH_VH[o.t]!=null)return{x:o.x,y:o.y-BEACH_VH[o.t],w:o.w,h:o.h+BEACH_VH[o.t]};return o.t==='house'?{x:o.x-6,y:o.y-64,w:o.w+12,h:o.h+64}:o.t==='wall'?{x:o.x,y:o.y-24,w:o.w,h:o.h+24}:{x:o.x,y:o.y-14,w:o.w,h:o.h+14}}
 function feetBlocked(x,y){const fx=x-11,fy=y+10,fw=22,fh=14;
   for(const o of G.obs){if(!isSolid(o))continue;const b=solidBox(o);if(fx<b.x+b.w&&fx+fw>b.x&&fy<b.y+b.h&&fy+fh>b.y)return true}return false}
-function pointBlocked(x,y){for(const o of G.obs){if(!isSolid(o)||o.t==='hole')continue;const b=visBox(o);if(x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h)return true}return false}
+function pointBlocked(x,y){for(const o of G.obs){if(!isSolid(o)||o.t==='hole'||o.t==='lamp')continue;const b=visBox(o);if(x>b.x&&x<b.x+b.w&&y>b.y&&y<b.y+b.h)return true}return false}
 function inPool(x,y){for(const q of G.pools)if(((x-q.x)/q.r)**2+((y-q.y)/(q.r*.55))**2<1)return q;return null}
 function inSand(x,y){if(G.pools&&inPool(x,y))return true;for(const o of G.obs)if((o.t==='sand'||o.t==='pool'||o.t==='concrete')&&x>o.x&&x<o.x+o.w&&y>o.y&&y<o.y+o.h)return true;return false}
 function shiftWorld(s){
@@ -1002,13 +1002,13 @@ function navMove(o,ux,uy,step,dt,blk){
 /* ---------- MARTIN THE BUILDER ---------- */
 const BUILD_SIZES={hole:[64,30],concrete:[120,64],shed:[86,44],lamp:[14,10]};
 const BUILD_ANIM={hole:'spade',concrete:'concrete',shed:'hammer',lamp:'drill'};
-const BUILD_SAY={hole:['Digging a hole!','Mind the hole!'],concrete:['Wet concrete!','Fresh driveway!'],shed:['Shed time!','Building a shed!'],lamp:['Fitting a light!','Let there be light!']};
+const BUILD_SAY={hole:['Digging a hole!','Mind the hole!'],concrete:['Wet concrete!','Fresh driveway!'],shed:['Shed time!','Building a shed!'],lamp:['Fitting some LED lights!','Garden lights!','Ooh, twinkly!']};
 function siteFree(x,y,w,h){const b={x:x-w/2-10,y:y-h/2-10,w:w+20,h:h+20};
   for(const o of G.obs){const s=solidBox(o);if(b.x<s.x+s.w&&b.x+b.w>s.x&&b.y<s.y+s.h&&b.y+b.h>s.y)return false}
   for(const p of G.players)if(dist(p.x,p.y+16,x,y)<70)return false;return true}
 function pickSite(e){const types=['hole','concrete','shed','lamp','hole','lamp'];
-  for(let k=0;k<25;k++){const t=pick(types),[w,h]=BUILD_SIZES[t],x=rnd(50+w/2,W-50-w/2),y=rnd(170,H-230);if(siteFree(x,y,w,h)){const side=x>W/2?-1:1;
-    return{t,x,y,w,h,side,mx:x-side*(w/2+24),my:y-8}}}return null}
+  for(let k=0;k<25;k++){const t=pick(types),v=t==='lamp'?pick(['string','stakes']):null,[w,h]=t==='lamp'?(v==='string'?[110,10]:[76,10]):BUILD_SIZES[t],x=rnd(50+w/2,W-50-w/2),y=rnd(170,H-230);if(siteFree(x,y,w,h)){const side=x>W/2?-1:1;
+    return{t,v,x,y,w,h,side,mx:x-side*(w/2+24),my:y-8}}}return null}
 function updBuilder(e,dt,sp,bd){
   e.y+=sp*dt;if(e.site){e.site.y+=sp*dt;e.site.my+=sp*dt}
   if(e.bstate==null){e.bstate='walk';e.jobs=0;e.site=null}
@@ -1023,8 +1023,8 @@ function updBuilder(e,dt,sp,bd){
   }else if(e.bstate==='build'){e.moving=false;const D=josie(),help=D&&D.helping===e;e.bt+=dt*(help?1.7:1);
     if(Math.random()<dt*6)G.parts.push({x:e.site.x+rnd(-e.site.w/2,e.site.w/2),y:e.site.y+rnd(-6,6),vx:rnd(-30,30),vy:rnd(-60,-20),life:.5,max:.5,r:rnd(2,4),col:e.site.t==='concrete'?'#b8b8b0':e.site.t==='hole'?'#7a5230':'#c9a46b',g:200});
     if(Math.floor(e.bt*3)!==Math.floor((e.bt-dt)*3))tone(e.site.t==='lamp'?900:e.site.t==='shed'?400:180,e.site.t==='lamp'?1000:200,.06,'square',.025);
-    if(e.bt>=3.6){const s=e.site;G.obs.push({t:s.t,x:s.x-s.w/2,y:s.y-s.h/2,w:s.w,h:s.h,built:true});e.jobs++;G.score+=0;
-      txt(s.x,s.y-50,{hole:'A HOLE!',concrete:'WET CONCRETE!',shed:'A SHED!',lamp:'A LAMP POST!'}[s.t],'#ffd93d',18);
+    if(e.bt>=3.6){const s=e.site;G.obs.push({t:s.t,v:s.v,x:s.x-s.w/2,y:s.y-s.h/2,w:s.w,h:s.h,built:true,seed:Math.random()*10});e.jobs++;G.score+=0;
+      txt(s.x,s.y-50,{hole:'A HOLE!',concrete:'WET CONCRETE!',shed:'A SHED!',lamp:'LED LIGHTS!'}[s.t],'#ffd93d',18);
       if(help){e.bstate='pat';e.patT=1.8;e.say=2;e.sayText='Good girl Josie!';D.patting=e}else{e.bstate='walk';e.site=null}}
   }
   for(const p of G.players)if(active(p)&&dist(e.x,e.y,p.x,p.y)<28)hurt(p);
@@ -1045,14 +1045,21 @@ function drawBuilt(o,ghost){const c=ctx,x=o.x,y=o.y,w=o.w,h=o.h;c.save();if(ghos
     c.fillStyle='#4a5a3a';c.beginPath();c.moveTo(x-6,top+22);c.lineTo(x+w/2,top-6);c.lineTo(x+w+6,top+22);c.closePath();c.fill();
     c.fillStyle='#5e3a1a';rr(x+w/2-12,y+h-34,24,34,2);c.fill();c.fillStyle='#ffd23f';circ(x+w/2+7,y+h-17,2);c.fill();
     c.fillStyle='#bfe3f5';c.fillRect(x+8,top+30,16,12);c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(x+8,top+30,16,12)}
-  else if(o.t==='lamp'){c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(x+w/2+4,y+h,10,4,0,0,7);c.fill();
-    c.fillStyle='#3a4048';c.fillRect(x+w/2-2.5,y-66,5,72);c.fillRect(x+w/2-6,y+2,12,6);c.fillRect(x+w/2-2,y-66,18,4);
-    c.fillStyle='#2b3138';rr(x+w/2+10,y-64,12,8,3);c.fill();
-    const g=c.createRadialGradient(x+w/2+16,y-56,2,x+w/2+16,y-56,34);g.addColorStop(0,'rgba(255,240,160,.8)');g.addColorStop(1,'rgba(255,240,160,0)');c.fillStyle=g;circ(x+w/2+16,y-56,34);c.fill();
-    c.fillStyle='#fff6c4';circ(x+w/2+16,y-55,3.5);c.fill()}
+  else if(o.t==='lamp'){const t=G.t,sd=o.seed||0,COLS=['#ff4d6d','#ffd93d','#5dff8a','#4dc3ff','#ff7ae0','#fff1b8'];
+    const glow=(gx,gy,col,r,a)=>{const g=c.createRadialGradient(gx,gy,0,gx,gy,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');c.globalAlpha=(ghost!=null?ghost:1)*a;c.fillStyle=g;circ(gx,gy,r);c.fill();c.globalAlpha=ghost!=null?ghost:1};
+    if(o.v==='string'){const top=y-34,x1=x+4,x2=x+w-4;
+      c.fillStyle='rgba(0,0,0,.18)';c.fillRect(x1-2,y+h,6,4);c.fillRect(x2-2,y+h,6,4);
+      c.fillStyle='#7a4a24';c.fillRect(x1-2.5,top-4,5,h+38);c.fillRect(x2-2.5,top-4,5,h+38);c.fillStyle='#5e3a1a';c.fillRect(x1-3.5,top-6,7,3);c.fillRect(x2-3.5,top-6,7,3);
+      c.strokeStyle='#2b2b2b';c.lineWidth=1.3;c.beginPath();c.moveTo(x1,top);c.quadraticCurveTo((x1+x2)/2,top+26,x2,top);c.stroke();
+      const n=Math.floor((x2-x1)/11);for(let i=1;i<n;i++){const u=i/n,bx=x1+(x2-x1)*u,by=top+52*u*(1-u)+3,col=COLS[i%COLS.length],tw=.55+.45*Math.sin(t*4+i*1.7+sd);
+        glow(bx,by,col,11,.55*tw);c.fillStyle=col;c.beginPath();c.ellipse(bx,by,2.6,3.4,0,0,7);c.fill();c.fillStyle='rgba(255,255,255,.8)';circ(bx-.7,by-1,.9);c.fill()}}
+    else{const n=4;for(let i=0;i<n;i++){const sx=x+6+i*(w-12)/(n-1),col=i%2?'#fff6c4':'#cfe8ff',tw=.75+.25*Math.sin(t*3+i+sd);
+        glow(sx,y+h,col,20,.35*tw);c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(sx+2,y+h,5,2,0,0,7);c.fill();
+        c.fillStyle='#23272d';c.fillRect(sx-1.5,y-10,3,h+12);c.fillStyle='#2f343b';rr(sx-5,y-20,10,10,2);c.fill();
+        c.fillStyle='#4b525b';c.fillRect(sx-6,y-22,12,3);glow(sx,y-15,col,12,.8*tw);c.fillStyle=col;c.fillRect(sx-3.5,y-17,7,4)}}}
   c.restore()}
 function drawSite(e){const s=e.site;if(!s||e.bstate!=='build')return;const f=clamp(e.bt/3.6,0,1);
-  drawBuilt({t:s.t,x:s.x-s.w/2,y:s.y-s.h/2,w:s.w,h:s.h},.25+.55*f);
+  drawBuilt({t:s.t,v:s.v,seed:1,x:s.x-s.w/2,y:s.y-s.h/2,w:s.w,h:s.h},.25+.55*f);
   ctx.strokeStyle='rgba(255,210,0,.9)';ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.strokeRect(s.x-s.w/2-6,s.y-s.h/2-6,s.w+12,s.h+12);ctx.setLineDash([]);
   ctx.fillStyle='rgba(0,0,0,.45)';rr(s.x-26,s.y+s.h/2+10,52,7,3);ctx.fill();ctx.fillStyle='#ffd93d';rr(s.x-26,s.y+s.h/2+10,52*f,7,3);ctx.fill()}
 function drawMartin(e,ESP){const M=ESP.meta;let row,fi=0,fl=false;
