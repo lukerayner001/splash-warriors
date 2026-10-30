@@ -70,6 +70,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
     <b>Player 2 keyboard:</b> Arrow keys to move, Enter to splash, Right Shift for a water balloon<br>
     <b>Phone/tablet:</b> each player drags a thumb on their own half of the screen (it splashes automatically). Tap the 🎈 button in your corner to throw a water balloon.<br>
     <b>🚁 George's helicopter:</b> pick George as the final boss. He fires blue Nerf darts from his minigun and drops bombs that count down 5…4…3…2…1…BOOM! Run out of the red circle, or splash a bomb 3 times to fizzle it out. Crash the helicopter and George jumps out for <b>round 2</b> on foot, throwing grenades that go off after 3 seconds.<br>
+    <b>🚗 Roads:</b> watch out for cars and buses! They honk, then knock you out of the road and cost a heart.<br>
     <b>🗺️ Exploring:</b> the screen only moves forward when a hero walks up. Walls, houses and hedges block your way (and your water!), so go round them or hide behind them. Sand pits slow you down. Uncle Luke leaves growing pools of blood when he stands still, and they slow you down too. On the beach it's boats, windbreaks, kayaks, paddleboards, parasols, deckchairs, sun loungers and fishing rods to dodge, and rock pools slow you down.<br>
     <b>🍰 Nanny Chickens:</b> throws cake and coleslaw at you! Splash the food out of the air. Coleslaw leaves a slippy mess that slows you down.<br>
     <b>👷 Martin the builder:</b> walks to spots in your way and builds things: holes to go round, wet concrete that slows you down (and leaves grey footprints), sheds and twinkly LED garden lights. Splash him before he finishes! Josie puts her hi-vis on to help him, which makes him build faster.<br>
@@ -399,6 +400,7 @@ function update(dt){
     if(!G.van&&!G.bath&&!G.boss&&vanBaddie()>=0&&G.players.some(active)){G.vanT-=dt;if(G.vanT<=0)startVan()}
     if(!G.bath&&!G.van&&!G.boss&&bathBaddie()>=0&&G.players.some(active)){G.bathT-=dt;if(G.bathT<=0)startBath()}
   }
+  updTraffic(dt);
   if(G.van)updVan(G.van,dt);
   if(G.bath)updBath(G.bath,dt);
   if(G.bathBanner>0)G.bathBanner-=dt;
@@ -1291,6 +1293,37 @@ function drawStats(){
   label(PADS.length?'Next level ▶  (press A)':isTouch?'Next level ▶  (tap)':'Next level ▶  (press Enter)',W/2,H-36,18,'#fff',null)}
 function statsNext(){if(G&&G.state==='stats'&&G.stateT<=0)nextLevel()}
 
+/* ---------- TRAFFIC ON THE ROADS ---------- */
+const CAR_COLS=['#e63946','#1d6fe0','#ffd23f','#2bb34a','#f4f4f4','#ff7a1a','#7b4fd6','#2b2f35'];
+function laneY(o,l){return o.y+o.h*(l?0.73:0.29)}
+function updTraffic(dt){
+  for(const o of G.obs){if(o.t!=='road'||o.y<-140||o.y>H+80)continue;
+    if(!o.cars){o.cars=[];o.spawn=[rnd(.2,1.5),rnd(.8,2.5)]}
+    for(let l=0;l<2;l++){o.spawn[l]-=dt;if(o.spawn[l]<=0){const bus=Math.random()<.22,dir=l?-1:1,w=bus?150:72;
+        o.cars.push({l,dir,x:dir>0?-w:W+w,w,h:bus?40:30,bus,col:pick(CAR_COLS),spd:bus?rnd(100,130):rnd(150,230),honk:0});o.spawn[l]=rnd(1.4,3.6)*(bus?1.4:1)}}
+    for(const v of o.cars){v.x+=v.dir*v.spd*dt;v.honk=Math.max(0,v.honk-dt);const ly=laneY(o,v.l);
+      for(const p of G.players){if(!active(p))continue;const fx=p.x,fy=p.y+16;
+        const inBox=fx>v.x-v.w/2-10&&fx<v.x+v.w/2+10&&fy>ly-v.h/2-8&&fy<ly+v.h/2+8;
+        const ahead=(fx-v.x)*v.dir>0&&(fx-v.x)*v.dir<170&&Math.abs(fy-ly)<v.h;
+        if(ahead&&v.honk<=0){v.honk=2.5;tone(v.bus?260:420,v.bus?260:420,.15,'square',.05);tone(v.bus?260:420,v.bus?260:420,.18,'square',.05,.2)}
+        if(inBox&&!(p.kb>0)){const up=fy<o.y+o.h/2;p.kb=.4;p.kbVx=v.dir*(v.bus?420:360);p.kbVy=up?-300:300;
+          if(p.inv<=0){G.hitSrc=v.bus?'🚌 Buses':'🚗 Cars';hurt(p);G.hitSrc=null;txt(p.x,p.y-50,v.bus?'BEEP BEEP! BUS!':pick(['BEEP!','OI! WATCH IT!','HONK!']),'#ffd93d',20)}}}}
+    o.cars=o.cars.filter(v=>v.x>-200&&v.x<W+200)}
+}
+function drawVehicle(v,o){const c=ctx,ly=laneY(o,v.l),x=v.x,w=v.w,h=v.h;c.save();c.translate(x,ly);c.scale(v.dir,1);
+  c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(4,h/2+2,w/2,6,0,0,7);c.fill();
+  c.fillStyle='#1b1b1b';[[-w/2+16,h/2-2],[w/2-18,h/2-2],[-w/2+16,-h/2+4],[w/2-18,-h/2+4]].forEach(([a,b])=>{c.beginPath();c.ellipse(a,b,7,4,0,0,7);c.fill()});
+  if(v.bus){c.fillStyle='#d62828';rr(-w/2,-h/2-14,w,h+12,8);c.fill();c.fillStyle='#a51d1d';c.fillRect(-w/2,h/2-6,w,4);
+    c.fillStyle='#bfe3f5';for(let i=0;i<6;i++){rr(-w/2+10+i*22,-h/2-10,16,10,2);c.fill();rr(-w/2+10+i*22,-h/2+6,16,10,2);c.fill()}
+    c.fillStyle='#2b2f35';rr(w/2-14,-h/2-12,10,h+6,3);c.fill();c.fillStyle='#ffd23f';c.fillRect(-w/2+40,-h/2-18,50,6);
+    c.fillStyle='#222';c.font=`bold 7px ${FONT}`;c.textAlign='center';c.textBaseline='middle';c.save();c.scale(v.dir,1);c.fillText('SPLASH 42',(v.dir>0?1:-1)*(-w/2+65),-h/2-15);c.restore();
+    c.fillStyle='#fff6c4';c.fillRect(w/2-3,h/2-14,4,6)}
+  else{c.fillStyle=v.col;rr(-w/2,-h/2,w,h,10);c.fill();c.fillStyle='rgba(0,0,0,.18)';c.fillRect(-w/2+4,h/2-7,w-8,4);
+    c.fillStyle='rgba(0,0,0,.15)';rr(-w/2+16,-h/2-8,w-34,h-6,7);c.fill();c.fillStyle=v.col;rr(-w/2+18,-h/2-10,w-36,h-8,7);c.fill();
+    c.fillStyle='#bfe3f5';rr(w/2-26,-h/2-7,9,h-14,3);c.fill();rr(-w/2+20,-h/2-7,9,h-14,3);c.fill();rr(-w/2+31,-h/2-7,w-60,h-14,3);c.fill();
+    c.fillStyle='#fff6c4';c.fillRect(w/2-3,-4,4,7);c.fillStyle='#ff3b3b';c.fillRect(-w/2-1,-4,3,7)}
+  c.restore()}
+
 /* ---------- DAD'S VAN ---------- */
 const vanBaddie=()=>cfg.baddies.findIndex(b=>b&&b.van);
 function honk(){tone(430,430,.14,'square',.06);tone(430,430,.2,'square',.06,.22)}
@@ -1558,6 +1591,7 @@ function draw(){
     emoji(k.em||{spread:'🌊',rapid:'⚡',heart:'❤️',shield:'🛡️',balloon:'🎈'}[k.type],k.x,k.y+bob+1,20)}
 
   const list=[];
+  for(const o of G.obs)if(o.t==='road'&&o.cars)for(const v of o.cars)list.push({y:laneY(o,v.l)-6,f:()=>drawVehicle(v,o)});
   for(const o of G.obs)if(isSolid(o)&&o.t!=='hole')list.push({y:o.y+o.h-24,f:()=>(o.t==='shed'||o.t==='lamp')?drawBuilt(o):drawSolidObs(o)});
   for(const e of G.enemies)if(e.site&&e.bstate==='build')list.push({y:e.site.y-30,f:()=>drawSite(e)});
   for(const e of G.enemies){const ESP=SPRITES[(cfg.baddies[e.b]||{}).sprite];
