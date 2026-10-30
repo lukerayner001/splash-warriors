@@ -595,7 +595,7 @@ function updDog(d,o,dt,sit,scale){
     if(d.bizT<=0&&!d.help&&d.y>110&&d.y<H-90&&!feetBlocked(d.x,d.y)){d.bizT=rnd(6,11);d.act=Math.random()<.5?'wee':'poo';d.actT=1.8;d.done=false;
       txt(d.x,d.y-34,d.act==='wee'?'psssst...':'plop!',d.act==='wee'?'#ffe66d':'#c98d3a',14);tone(d.act==='wee'?900:200,d.act==='wee'?700:120,.3,'sine',.04);return}}
   const dx=tx-d.x,dy=ty-d.y,dd=Math.hypot(dx,dy);d.moving=dd>4;
-  if(d.moving){const s2=Math.min(spd,dd/dt);if(gone){d.x+=dx/dd*s2*dt;d.y+=dy/dd*s2*dt;d.fx=dx/dd;d.fy=dy/dd}else navMove(d,dx/dd,dy/dd,s2*dt,dt);
+  if(d.moving){const s2=Math.min(spd,dd/dt);if(gone){d.x+=dx/dd*s2*dt;d.y+=dy/dd*s2*dt;d.fx=dx/dd;d.fy=dy/dd}else pathMove(d,tx,ty,s2*dt,dt);
     d.walk+=dt*12;d.vx=d.fx;d.vy=d.fy;if(Math.abs(d.fx||0)>.25)d.face=d.fx>0?1:-1}
   d.lick=sit&&dd<10;if(d.lick)d.face=-1;
   if(d.lick&&Math.random()<dt*2.5){G.parts.push({x:o.x+rnd(0,14),y:o.y+20,vx:rnd(-20,20),vy:-50,life:.8,max:.8,r:3,col:'#ff8fb1',g:-10});
@@ -628,7 +628,7 @@ function updEnemy(e,dt,sp){
   const dx=e.tx-e.x,dy=e.ty-e.y,d=Math.hypot(dx,dy),v=55+G.level*8;
   if(bd.food&&updThrow(e,dt)){}
   else if(e.shootT>0){e.shootT-=dt;e.moving=false}
-  else{e.moving=d>6;if(e.moving){navMove(e,dx/d,dy/d,v*dt,dt);e.walk+=dt*9}}
+  else{e.moving=d>6;if(e.moving){pathMove(e,e.tx,e.ty,v*dt,dt);e.walk+=dt*9}}
   if(bd.sprite==='luke'&&e.y>40){
     if(!e.moving){if(!e.pool||e.pool.gone){e.pool={x:e.x+rnd(-4,4),y:e.y+22,r:5,max:rnd(36,52),seed:Math.random()*10};G.pools.push(e.pool);if(G.pools.length>30)G.pools.shift().gone=true}
       e.pool.r=Math.min(e.pool.max,e.pool.r+dt*13);if(Math.random()<dt*2)G.parts.push({x:e.x+rnd(-10,10),y:e.y-10,vx:0,vy:40,life:.5,max:.5,r:2,col:'#9e0f1a',g:300})}
@@ -835,9 +835,6 @@ function updBath(B,dt){
   if(B.state==='chase'){B.chaseT-=dt;const p=nearest(m.x,m.y);
     if(!p||B.chaseT<=0){B.state='leave';B.say=2.2;B.sayText=pick(['Fine, stay mucky then!',"I'll get you later!",'Smelly boys!'])}
     else{tx=p.x;ty=p.y;spd=80+G.level*5;
-      // stuck recovery: if she hasn't got anywhere for a while, take a detour to a clear spot
-      B.progT=(B.progT||0)+dt;if(B.progT>1.6){if(dist(m.x,m.y,B.px||0,B.py||0)<26){let k=0,wx,wy;do{wx=rnd(70,W-70);wy=clamp(m.y+rnd(-160,160),90,H-160);k++}while(k<12&&mumBlocked(wx,wy,0,1));B.wp={x:wx,y:wy,t:1.8};m.det=null}B.progT=0;B.px=m.x;B.py=m.y}
-      if(B.wp){B.wp.t-=dt;if(B.wp.t<=0||dist(m.x,m.y,B.wp.x,B.wp.y)<12)B.wp=null;else{tx=B.wp.x;ty=B.wp.y}}
       B.sayT-=dt;if(B.sayT<=0){B.sayT=rnd(4,7);B.say=1.8;B.sayText=pick([ph,'Come here, mucky pup!','Behind your ears too!','Rub-a-dub-dub!'])}
       for(const q of G.players)if(active(q)&&q.inv<=0&&((q.x-B.bx)/58)**2+((q.y+12-(B.by-22))/32)**2<1){catchBath(B,q);break}}}
   if(B.state==='wash'){tx=B.bx+10;ty=B.by-62;spd=120;B.wt+=dt;const p=G.players[B.captive];p.x=B.bx-8;p.y=B.by-30;
@@ -848,13 +845,13 @@ function updBath(B,dt){
   if(B.state==='leave'||B.state==='flee'){tx=m.x;ty=-200;spd=B.state==='flee'?170:110;if(m.y<-150)endBath()}
   if(B.state==='flee'&&Math.random()<.6)G.parts.push({x:m.x+rnd(-12,12),y:m.y-rnd(0,80),vx:0,vy:50,life:.5,max:.5,r:2.5,col:'#5ec8ff',g:200});
   if(tx!=null){const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy);m.moving=d>3;
-    if(m.moving){const s2=Math.min(spd,d/dt),fx0=m.fx,fy0=m.fy;navMove(m,dx/d,dy/d,s2*dt,dt,B.state==='wash'?null:mumBlocked);m.walk+=dt*8;if(B.state==='wash'){m.fx=fx0;m.fy=fy0}}
+    if(m.moving){const s2=Math.min(spd,d/dt),fx0=m.fx,fy0=m.fy;if(B.state==='wash')navMove(m,dx/d,dy/d,s2*dt,dt);else pathMove(m,tx,ty,s2*dt,dt,'bath');m.walk+=dt*8;if(B.state==='wash'){m.fx=fx0;m.fy=fy0}}
     if(B.state==='wash'&&!m.moving){m.fx=0;m.fy=1}}
   if(B.state!=='wash'){const vert=Math.abs(m.fy)>=Math.abs(m.fx)*1.1,ox=vert?0:Math.sign(m.fx)*64,oy=vert?(m.fy>0?56:-30):26;
     const kk=Math.min(1,dt*7);B.bx+=(m.x+ox-B.bx)*kk;B.by+=(m.y+oy-B.by)*kk}
 }
 function bathOffset(ax,ay){const vert=Math.abs(ay)>=Math.abs(ax)*1.1;return vert?[0,ay>0?56:-30]:[Math.sign(ax)*64,26]}
-function mumBlocked(x,y,ax,ay){if(feetBlocked(x,y))return true;const [ox,oy]=bathOffset(ax,ay),bx=x+ox,by=y+oy,b={x:bx-54,y:by-40,w:108,h:36};
+function mumBlocked(x,y,ax,ay){if(feetBlocked(x,y))return true;const b={x:x-46,y:y-18,w:92,h:52};
   for(const o of G.obs){if(!isSolid(o))continue;const s=solidBox(o);if(b.x<s.x+s.w&&b.x+b.w>s.x&&b.y<s.y+s.h&&b.y+b.h>s.y)return true}return false}
 function catchBath(B,p){{const st=ST(p.i);if(st)st.bathed++}B.state='wash';B.wt=0;B.captive=p.i;p.captured=true;p.inBath=true;p.power=null;p.shield=0;
   B.say=2.2;B.sayText=pick(['In you get!','Gotcha! Bath time!','Look at the state of you!']);
@@ -998,7 +995,7 @@ function updFoot(b,dt){
   if(b.state==='jump'||b.state==='fight'){
     if(b.state==='fight'&&(b.pause||0)>0){b.pause-=dt;b.moving=false}
     else{const dx=b.tx-b.x,dy=b.ty-b.y,d=Math.hypot(dx,dy),spd=b.state==='jump'?170:110+G.level*10;
-      if(d>4){const s2=Math.min(spd,d/dt);navMove(b,dx/d,dy/d,s2*dt,dt);b.walk+=dt*10;b.moving=true;if(b.state==='fight'&&Math.random()<dt*.4){b.tx=rnd(70,W-70);b.ty=rnd(180,290)}}
+      if(d>4){const s2=Math.min(spd,d/dt);pathMove(b,b.tx,b.ty,s2*dt,dt);b.walk+=dt*10;b.moving=true;if(b.state==='fight'&&Math.random()<dt*.4){b.tx=rnd(70,W-70);b.ty=rnd(180,290)}}
       else{if(b.state==='jump')b.state='fight';b.tx=rnd(70,W-70);b.ty=rnd(180,290);if(Math.random()<.4)b.pause=rnd(.5,1.2)}}}
   if(b.state!=='fight')return;
   b.sayT-=dt;if(b.sayT<=0){b.sayT=rnd(4,7);b.say=2;b.sayText=pick(['Catch!','Fire in the hole!',"You'll never get me!",'Grenade!','Missed me!'])}
@@ -1025,7 +1022,10 @@ function drawWreck(){const w=G.wreck,SP=SPRITES.heli;if(!w||!spReady(SP))return;
 const SCROLL_LINE=330,CHUNK=270;
 const HOUSE_COLS=['#f4e3c1','#dfe9f2','#f2d4d0','#e3efd9','#efe6f5'],ROOF_COLS=['#b5473a','#5d6b7a','#8a5a3c','#3f6e8c'];
 function mkHouse(x,y){return{t:'house',x,y,w:140,h:62,col:pick(HOUSE_COLS),roof:pick(ROOF_COLS),door:pick(['#7a4a2a','#2f5d8a','#a23b3b','#3c7a4a'])}}
-function genChunk(y0){if(W<900)return genChunkBase(y0);
+function genChunk(y0){return clearRoads(genChunk2(y0))}
+function clearRoads(L){const rd=L.filter(o=>o.t==='road'||o.t==='boardwalk');if(!rd.length)return L;
+  return L.filter(o=>{if(o.t==='road'||o.t==='boardwalk')return true;const b=o.t==='house'?{y:o.y-64,h:o.h+64}:{y:o.y-30,h:o.h+30};return !rd.some(r=>b.y<r.y+r.h+14&&b.y+b.h>r.y-14)})}
+function genChunk2(y0){if(W<900)return genChunkBase(y0);
   const full=W,half=Math.round(W/2);W=half;const A=genChunkBase(y0),B=genChunkBase(y0);W=full;B.forEach(o=>o.x+=half);
   let L=[...A,...B];const wide=L.filter(o=>o.t==='road'||o.t==='boardwalk');if(wide.length){L=L.filter(o=>!wide.includes(o));const r=wide[0];r.x=0;r.w=W;L.push(r)}
   return L}
@@ -1153,6 +1153,39 @@ function drawBeachSolid(o){const c=ctx,x=o.x,y=o.y,w=o.w,h=o.h;
 
 
 /* ---------- BADDIE NAVIGATION ROUND OBSTACLES ---------- */
+/* ---------- PATHFINDING (grid BFS so baddies plan a route round obstacles) ---------- */
+const GC=20,GOY=-160;
+function getGrid(kind){G.grids=G.grids||{};const key=kind||'n';const cached=G.grids[key];if(cached&&cached.t===G.t)return cached;
+  const ix=kind==='bath'?52:14,iyT=kind==='bath'?40:10,iyB=kind==='bath'?40:12;
+  const cols=Math.ceil(W/GC),rows=Math.ceil((H-GOY+160)/GC),g=new Uint8Array(cols*rows);
+  for(const o of G.obs){if(!isSolid(o))continue;const s=solidBox(o);
+    const c0=Math.floor((s.x-ix)/GC),c1=Math.floor((s.x+s.w+ix)/GC),r0=Math.floor((s.y-iyB-GOY)/GC),r1=Math.floor((s.y+s.h+iyT-GOY)/GC);
+    for(let r=Math.max(0,r0);r<=Math.min(rows-1,r1);r++)for(let c=Math.max(0,c0);c<=Math.min(cols-1,c1);c++)g[r*cols+c]=1}
+  const out={g,cols,rows,t:G.t};G.grids[key]=out;return out}
+function findWaypoint(gr,sx,sy,tx,ty){const {g,cols,rows}=gr;const cell=(x,y)=>[clamp(Math.floor(x/GC),0,cols-1),clamp(Math.floor((y-GOY)/GC),0,rows-1)];
+  let [sc,sr]=cell(sx,sy);const [tc,tr]=cell(tx,ty);
+  if(g[sr*cols+sc]){let best=null,bd=1e9;for(let r=sr-3;r<=sr+3;r++)for(let c=sc-3;c<=sc+3;c++){if(r<0||c<0||r>=rows||c>=cols||g[r*cols+c])continue;const d=(r-sr)**2+(c-sc)**2;if(d<bd){bd=d;best=[c,r]}}if(!best)return null;[sc,sr]=best}
+  const N=cols*rows,prev=new Int32Array(N).fill(-1),q=new Int32Array(N);let h=0,t=0;const s0=sr*cols+sc;q[t++]=s0;prev[s0]=s0;
+  let goal=-1,bestI=s0,bestD=1e9;const tI=tr*cols+tc;
+  const D=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+  while(h<t){const i=q[h++];const c=i%cols,r=(i/cols)|0;const dd=(c-tc)**2+(r-tr)**2;if(dd<bestD){bestD=dd;bestI=i}if(i===tI){goal=i;break}
+    for(const [dc,dr] of D){const nc=c+dc,nr=r+dr;if(nc<0||nr<0||nc>=cols||nr>=rows)continue;const ni=nr*cols+nc;if(prev[ni]!==-1||g[ni])continue;
+      if(dc&&dr&&(g[r*cols+nc]||g[nr*cols+c]))continue;prev[ni]=i;q[t++]=ni}}
+  let end=goal>=0?goal:bestI;const path=[];for(let i=end;i!==s0;i=prev[i]){path.push(i);if(path.length>400)break}path.reverse();
+  if(!path.length)return null;const pick=path[Math.min(2,path.length-1)];return{x:(pick%cols)*GC+GC/2,y:((pick/cols)|0)*GC+GC/2+GOY,last:path.length<=3&&goal>=0}}
+function pathMove(o,tx,ty,step,dt,kind){
+  const fx=o.x,fy=o.y+17;o.pT=(o.pT||0)-dt;
+  if(o.pT<=0||!o.wp||dist(fx,fy,o.wp.x,o.wp.y)<10){o.pT=.3;const wp=findWaypoint(getGrid(kind),fx,fy,tx,ty+17);o.wp=wp}
+  let gx=tx,gy=ty+17;if(o.wp&&!o.wp.last){gx=o.wp.x;gy=o.wp.y}
+  const dx=gx-fx,dy=gy-fy,d=Math.hypot(dx,dy)||1;
+  if(o.ghost>0){o.ghost-=dt;o.x=clamp(o.x+dx/d*step,16,W-16);o.y+=dy/d*step;o.fx=dx/d;o.fy=dy/d;return step}
+  const mm=navMove(o,dx/d,dy/d,step,dt,kind==='bath'?mumBlocked:null);
+  // progress watchdog: if not getting closer for a while, slip past
+  if(!o.anc||dist(o.x,o.y,o.anc[0],o.anc[1])>40){o.anc=[o.x,o.y];o.noProg=0}else o.noProg=(o.noProg||0)+dt;
+  if(o.noProg>2.5&&dist(o.x,o.y,tx,ty)>60){o.noProg=0;o.anc=null;o.ghost=.9;o.wp=null}
+  return mm}
+function roadAt(y,pad){pad=pad||12;for(const o of G.obs)if((o.t==='road'||o.t==='boardwalk')&&y>o.y-pad&&y<o.y+o.h+pad)return true;return false}
+
 function navMove(o,ux,uy,step,dt,blk){
   const ox=o.x,oy=o.y;const B_=blk||((x,y)=>feetBlocked(x,y));
   const ok=(nx,ny,ax,ay)=>nx>14&&nx<W-14&&!B_(nx,ny,ax,ay);
@@ -1177,6 +1210,7 @@ const BUILD_SIZES={hole:[64,30],concrete:[120,64],shed:[86,44],lamp:[14,10]};
 const BUILD_ANIM={hole:'spade',concrete:'concrete',shed:'hammer',lamp:'drill'};
 const BUILD_SAY={hole:['Digging a hole!','Mind the hole!'],concrete:['Wet concrete!','Fresh driveway!'],shed:['Shed time!','Building a shed!'],lamp:['Fitting some LED lights!','Garden lights!','Ooh, twinkly!']};
 function siteFree(x,y,w,h){const b={x:x-w/2-10,y:y-h/2-10,w:w+20,h:h+20};
+  if(roadAt(y-h/2-30,10)||roadAt(y+h/2+10,10)||roadAt(y,10))return false;
   for(const o of G.obs){const s=solidBox(o);if(b.x<s.x+s.w&&b.x+b.w>s.x&&b.y<s.y+s.h&&b.y+b.h>s.y)return false}
   for(const p of G.players)if(dist(p.x,p.y+16,x,y)<70)return false;return true}
 function pickSite(e){const types=['hole','concrete','shed','lamp','hole','lamp'];
@@ -1190,7 +1224,7 @@ function updBuilder(e,dt,sp,bd){
   if(e.bstate==='walk'){
     if(!e.site){if(e.jobs>=4){e.state='leave';e.say=1.8;e.sayText="Job done!";return}e.site=pickSite(e);if(!e.site){e.state='leave';return}}
     const dx=e.site.mx-e.x,dy=e.site.my-e.y,d=Math.hypot(dx,dy);
-    if(d>5){e.moving=true;navMove(e,dx/d,dy/d,(70+G.level*6)*dt,dt);e.walk+=dt*9;e.stuck=(e.stuck||0)+dt;if(e.stuck>9){e.site=null;e.stuck=0}}
+    if(d>5){e.moving=true;pathMove(e,e.site.mx,e.site.my,(70+G.level*6)*dt,dt);e.walk+=dt*9;e.stuck=(e.stuck||0)+dt;if(e.stuck>9){e.site=null;e.stuck=0}}
     else{e.moving=false;e.bstate='build';e.bt=0;e.stuck=0;e.say=2;e.sayText=pick(BUILD_SAY[e.site.t]);e.fx=e.site.side;e.fy=0;
       if(!siteFree(e.site.x,e.site.y,e.site.w,e.site.h)){e.bstate='walk';e.site=null}}
   }else if(e.bstate==='build'){e.moving=false;const D=josie(),help=D&&D.helping===e;e.bt+=dt*(help?1.7:1);
@@ -1393,7 +1427,7 @@ function updDad(e,dt){
   if(e.mode==='giveup'||e.mode==='flee'){tx=door.x;ty=door.y;spd=e.mode==='flee'?175:110}
   if(e.mode==='flee'&&Math.random()<.6)G.parts.push({x:e.x+rnd(-12,12),y:e.y-rnd(10,80),vx:0,vy:50,life:.5,max:.5,r:2.5,col:'#5ec8ff',g:200});
   if(tx!=null){const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy);e.moving=d>3;
-    if(e.moving){const s2=Math.min(spd,d/dt);navMove(e,dx/d,dy/d,s2*dt,dt);e.walk+=dt*9}
+    if(e.moving){const s2=Math.min(spd,d/dt);pathMove(e,tx,ty,s2*dt,dt);e.walk+=dt*9}
     if(e.mode!=='chase'&&d<6)boardVan(e)}
 }
 function capture(e,p){{const st=ST(p.i);if(st)st.caught++}p.captured=true;p.carried=true;p.power=null;p.shield=0;e.carrying=p.i;e.mode='carry';e.say=2;e.sayText=pick(['Gotcha!','Into the van!','Home time!']);
@@ -1620,7 +1654,7 @@ function draw(){
     c.fillStyle='rgba(255,255,255,.35)';c.beginPath();c.ellipse(-q.r*.35,-q.r*.18,q.r*.22,q.r*.07,-.3,0,7);c.fill();c.restore()}
   for(const q of G.poos){if(q.sq){ctx.fillStyle='rgba(107,68,35,.75)';ctx.beginPath();ctx.ellipse(q.x,q.y,13,5,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(q.x+9,q.y+2,5,2.5,0,0,7);ctx.fill()}
     else{ctx.fillStyle='rgba(0,0,0,.18)';ctx.beginPath();ctx.ellipse(q.x,q.y+3,10,3.5,0,0,7);ctx.fill();emoji('💩',q.x,q.y-6,20)}}
-  G.decor.forEach(drawDecor);
+  G.decor.forEach(d=>{if(!roadAt(d.y,22))drawDecor(d)});
   for(const k of G.pickups){const bob=Math.sin(k.t*5)*4,blink=k.t>12&&Math.floor(k.t*8)%2;if(blink)continue;
     ctx.fillStyle='rgba(255,255,255,.85)';circ(k.x,k.y+bob,17);ctx.fill();ctx.strokeStyle='#ffd93d';ctx.lineWidth=3;ctx.stroke();
     emoji(k.em||{spread:'🌊',rapid:'⚡',heart:'❤️',shield:'🛡️',balloon:'🎈'}[k.type],k.x,k.y+bob+1,20)}
