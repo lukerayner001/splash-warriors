@@ -665,6 +665,9 @@ function updBath(B,dt){
   if(B.state==='chase'){B.chaseT-=dt;const p=nearest(m.x,m.y);
     if(!p||B.chaseT<=0){B.state='leave';B.say=2.2;B.sayText=pick(['Fine, stay mucky then!',"I'll get you later!",'Smelly boys!'])}
     else{tx=p.x;ty=p.y;spd=80+G.level*5;
+      // stuck recovery: if she hasn't got anywhere for a while, take a detour to a clear spot
+      B.progT=(B.progT||0)+dt;if(B.progT>1.6){if(dist(m.x,m.y,B.px||0,B.py||0)<26){let k=0,wx,wy;do{wx=rnd(70,W-70);wy=clamp(m.y+rnd(-160,160),90,H-160);k++}while(k<12&&mumBlocked(wx,wy,0,1));B.wp={x:wx,y:wy,t:1.8};m.det=null}B.progT=0;B.px=m.x;B.py=m.y}
+      if(B.wp){B.wp.t-=dt;if(B.wp.t<=0||dist(m.x,m.y,B.wp.x,B.wp.y)<12)B.wp=null;else{tx=B.wp.x;ty=B.wp.y}}
       B.sayT-=dt;if(B.sayT<=0){B.sayT=rnd(4,7);B.say=1.8;B.sayText=pick([ph,'Come here, mucky pup!','Behind your ears too!','Rub-a-dub-dub!'])}
       for(const q of G.players)if(active(q)&&q.inv<=0&&((q.x-B.bx)/58)**2+((q.y+12-(B.by-22))/32)**2<1){catchBath(B,q);break}}}
   if(B.state==='wash'){tx=B.bx+10;ty=B.by-62;spd=120;B.wt+=dt;const p=G.players[B.captive];p.x=B.bx-8;p.y=B.by-30;
@@ -675,11 +678,14 @@ function updBath(B,dt){
   if(B.state==='leave'||B.state==='flee'){tx=m.x;ty=-200;spd=B.state==='flee'?170:110;if(m.y<-150)endBath()}
   if(B.state==='flee'&&Math.random()<.6)G.parts.push({x:m.x+rnd(-12,12),y:m.y-rnd(0,80),vx:0,vy:50,life:.5,max:.5,r:2.5,col:'#5ec8ff',g:200});
   if(tx!=null){const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy);m.moving=d>3;
-    if(m.moving){const s2=Math.min(spd,d/dt),fx0=m.fx,fy0=m.fy;navMove(m,dx/d,dy/d,s2*dt,dt);m.walk+=dt*8;if(B.state==='wash'){m.fx=fx0;m.fy=fy0}}
+    if(m.moving){const s2=Math.min(spd,d/dt),fx0=m.fx,fy0=m.fy;navMove(m,dx/d,dy/d,s2*dt,dt,B.state==='wash'?null:mumBlocked);m.walk+=dt*8;if(B.state==='wash'){m.fx=fx0;m.fy=fy0}}
     if(B.state==='wash'&&!m.moving){m.fx=0;m.fy=1}}
   if(B.state!=='wash'){const vert=Math.abs(m.fy)>=Math.abs(m.fx)*1.1,ox=vert?0:Math.sign(m.fx)*64,oy=vert?(m.fy>0?56:-30):26;
     const kk=Math.min(1,dt*7);B.bx+=(m.x+ox-B.bx)*kk;B.by+=(m.y+oy-B.by)*kk}
 }
+function bathOffset(ax,ay){const vert=Math.abs(ay)>=Math.abs(ax)*1.1;return vert?[0,ay>0?56:-30]:[Math.sign(ax)*64,26]}
+function mumBlocked(x,y,ax,ay){if(feetBlocked(x,y))return true;const [ox,oy]=bathOffset(ax,ay),bx=x+ox,by=y+oy,b={x:bx-54,y:by-40,w:108,h:36};
+  for(const o of G.obs){if(!isSolid(o))continue;const s=solidBox(o);if(b.x<s.x+s.w&&b.x+b.w>s.x&&b.y<s.y+s.h&&b.y+b.h>s.y)return true}return false}
 function catchBath(B,p){B.state='wash';B.wt=0;B.captive=p.i;p.captured=true;p.inBath=true;p.power=null;p.shield=0;
   B.say=2.2;B.sayText=pick(['In you get!','Gotcha! Bath time!','Look at the state of you!']);
   for(let k=0;k<20;k++)bathBubble(B.bx,B.by-46);tone(300,900,.3,'sine',.08);tone(900,300,.3,'sine',.05,.15);
@@ -973,11 +979,11 @@ function drawBeachSolid(o){const c=ctx,x=o.x,y=o.y,w=o.w,h=o.h;
 
 
 /* ---------- BADDIE NAVIGATION ROUND OBSTACLES ---------- */
-function navMove(o,ux,uy,step,dt){
-  const ox=o.x,oy=o.y;
-  const ok=(nx,ny)=>nx>14&&nx<W-14&&!feetBlocked(nx,ny);
-  const go=(ax,ay)=>{const nx=o.x+ax*step,ny=o.y+ay*step;if(ok(nx,ny)){o.x=nx;o.y=ny;return true}return false};
-  if(feetBlocked(o.x,o.y)||o.x<=14||o.x>=W-14){o.x+=ux*step;o.y+=uy*step;}   // overlapping or off the side - just walk in/out
+function navMove(o,ux,uy,step,dt,blk){
+  const ox=o.x,oy=o.y;const B_=blk||((x,y)=>feetBlocked(x,y));
+  const ok=(nx,ny,ax,ay)=>nx>14&&nx<W-14&&!B_(nx,ny,ax,ay);
+  const go=(ax,ay)=>{const nx=o.x+ax*step,ny=o.y+ay*step;if(ok(nx,ny,ax,ay)){o.x=nx;o.y=ny;return true}return false};
+  if(B_(o.x,o.y,ux,uy)||o.x<=14||o.x>=W-14){o.x+=ux*step;o.y+=uy*step;}   // overlapping or off the side - just walk in/out
   else if(go(ux,uy)){o.det=null}                                            // clear path
   else if(o.det&&go(o.det[0],o.det[1])){}                                   // keep following the wall the same way
   else if(!o.det&&Math.abs(ux)>.2&&go(Math.sign(ux),0)){}                   // slide along
