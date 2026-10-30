@@ -47,6 +47,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
     <div class="cards" id="heroes"></div>
     <div class="opts">
       <label><input type="checkbox" id="two">2 players</label>
+      <label><input type="checkbox" id="music">🎵 Music</label>
       <label><input type="checkbox" id="drawn">🎨 Drawn style (trial): draw everyone in code instead of sprites</label>
       <label><input type="checkbox" id="auto">Auto-splash on keyboard &amp; touch (controllers always hold a button)</label>
     </div>
@@ -79,7 +80,7 @@ canvas{touch-action:none;display:block;-webkit-user-select:none;user-select:none
     <b>Special baddies:</b> tick 🍬 to make a baddie throw sweets the heroes can catch (🍫 = extra heart, 🍬🍭 = sugar rush!). Give them a dog's name and their dog follows them around (and sometimes licks their toes).<br>
     Water balloons lob over and soak everyone near where they land. You start with 5, and baddies sometimes drop more.<br>
     You splash in the direction you walk. Splash the flying socks to knock them away!<br>
-    <b>Esc</b> or <b>P</b> pauses · <b>M</b> mutes.<br><br>
+    <b>Esc</b> or <b>P</b> pauses · <b>M</b> mutes everything · <b>N</b> turns the music on/off.<br>If there's no sound on an iPhone or iPad, check the silent switch on the side is off.<br><br>
     Photos stay on this device and are never uploaded. Tip: crop each photo close around the face first so it fills the circle.
   </section>
 </div></div>
@@ -181,7 +182,7 @@ function textIn(obj,key,ph,max){const i=document.createElement('input');i.type='
 function clearBtn(obj){const b=document.createElement('button');b.className='clr';b.textContent=obj.face?'✖ remove photo':'';
   b.onclick=e=>{e.preventDefault();obj.face=null;save();renderSetup()};return b}
 function renderSetup(){
-  $('#two').checked=!!cfg.twoPlayer;$('#drawn').checked=!!cfg.drawnStyle;$('#auto').checked=!!cfg.autofire;
+  $('#two').checked=!!cfg.twoPlayer;$('#drawn').checked=!!cfg.drawnStyle;$('#music').checked=cfg.music!==false;$('#auto').checked=!!cfg.autofire;
   const hs=$('#heroes');hs.innerHTML='';
   cfg.players.forEach((p,i)=>{
     if(i===1&&!cfg.twoPlayer)return;
@@ -224,6 +225,7 @@ $('#boss').onchange=e=>{cfg.boss=+e.target.value;save()};
 $('#two').onchange=e=>{cfg.twoPlayer=e.target.checked;save();renderSetup()};
 $('#auto').onchange=e=>{cfg.autofire=e.target.checked;save()};
 $('#drawn').onchange=e=>{cfg.drawnStyle=e.target.checked;save()};
+$('#music').onchange=e=>{cfg.music=e.target.checked;save()};
 $('#addB').onclick=()=>{cfg.baddies.push({name:'Baddie '+(cfg.baddies.length+1),phrase:'',face:null});save();renderSetup()};
 $('#start').onclick=startGame;
 function renderLevels(){const L=$('#levels');L.innerHTML='';const lv=cfg.startLevel||1;
@@ -244,21 +246,53 @@ function backToSetup(){running=false;paused=false;$('#game').style.display='none
   try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}
 
 /* ---------- AUDIO ---------- */
-let AC=null,muted=false,lastShootSnd=0;
-function unlockAudio(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume().catch(()=>{})}
-function tone(f1,f2,dur,type,vol,delay){if(!AC||muted)return;const t=AC.currentTime+(delay||0);const o=AC.createOscillator(),g=AC.createGain();
+let AC=null,MASTER=null,SFXBUS=null,MUSBUS=null,NOISE=null,muted=false,lastShootSnd=0;
+function unlockAudio(){
+  if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)();
+    const comp=AC.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;
+    MASTER=AC.createGain();MASTER.gain.value=.9;MASTER.connect(comp);comp.connect(AC.destination);
+    SFXBUS=AC.createGain();SFXBUS.gain.value=1;SFXBUS.connect(MASTER);MUSBUS=AC.createGain();MUSBUS.gain.value=.55;MUSBUS.connect(MASTER);
+    const len=AC.sampleRate;NOISE=AC.createBuffer(1,len,AC.sampleRate);const d=NOISE.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+    // play a silent blip to fully unlock on iOS
+    const b=AC.createBuffer(1,1,22050),s=AC.createBufferSource();s.buffer=b;s.connect(AC.destination);s.start(0)}catch(e){}}
+  if(AC&&AC.state==='suspended')AC.resume().catch(()=>{})}
+['pointerdown','touchstart','keydown','click'].forEach(ev=>addEventListener(ev,unlockAudio,{passive:true}));
+function tone(f1,f2,dur,type,vol,delay,bus){if(!AC||muted)return;const t=AC.currentTime+(delay||0);const o=AC.createOscillator(),g=AC.createGain();
   o.type=type||'square';o.frequency.setValueAtTime(f1,t);o.frequency.exponentialRampToValueAtTime(Math.max(30,f2),t+dur);
-  g.gain.setValueAtTime(vol||.06,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+dur+.02)}
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.06,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g).connect(bus||SFXBUS||AC.destination);o.start(t);o.stop(t+dur+.03)}
+function noise(dur,f1,f2,ftype,vol,delay,q){if(!AC||muted||!NOISE)return;const t=AC.currentTime+(delay||0);
+  const s=AC.createBufferSource();s.buffer=NOISE;s.loop=true;const f=AC.createBiquadFilter();f.type=ftype||'lowpass';f.Q.value=q||1;
+  f.frequency.setValueAtTime(f1,t);f.frequency.exponentialRampToValueAtTime(Math.max(40,f2),t+dur);
+  const g=AC.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.1,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  s.connect(f).connect(g).connect(SFXBUS||AC.destination);s.start(t,Math.random()*.5);s.stop(t+dur+.05)}
 function sfx(n){
-  if(n==='shoot'){const now=performance.now();if(now-lastShootSnd<110)return;lastShootSnd=now;tone(900,520,.06,'sine',.03)}
-  else if(n==='splash'){tone(700,140,.3,'triangle',.12);[0,1,2].forEach(k=>tone(900+k*120,1300+k*120,.07,'square',.035,.12+k*.09))}
-  else if(n==='hit')tone(320,90,.28,'sawtooth',.07);
-  else if(n==='throw')tone(240,420,.1,'triangle',.035);
-  else if(n==='pickup')[523,659,784,1047].forEach((f,k)=>tone(f,f,.1,'square',.05,k*.07));
-  else if(n==='boss'){tone(110,220,.7,'sawtooth',.08);tone(165,330,.7,'square',.04,.1)}
-  else if(n==='win')[523,659,784,659,784,1047].forEach((f,k)=>tone(f,f*1.01,.18,'square',.06,k*.15));
-  else if(n==='pop')tone(1200,300,.12,'sine',.07);
+  if(n==='shoot'){const now=performance.now();if(now-lastShootSnd<95)return;lastShootSnd=now;
+    noise(.09,6000,2500,'bandpass',.05,0,2);tone(rnd(700,820),rnd(1100,1300),.06,'sine',.025)}
+  else if(n==='splash'){noise(.45,4000,300,'lowpass',.16);noise(.25,1800,900,'bandpass',.08,.05,3);
+    [0,1,2,3].forEach(k=>tone(rnd(500,900),rnd(1200,1800),.05,'sine',.03,.08+k*.06))}
+  else if(n==='hit'){tone(520,180,.22,'square',.05);tone(260,90,.3,'triangle',.08,.02);noise(.12,1500,400,'lowpass',.06)}
+  else if(n==='throw'){noise(.18,800,2400,'bandpass',.05,0,1.5)}
+  else if(n==='pickup'){[784,988,1175,1568].forEach((f,k)=>{tone(f,f,.12,'triangle',.06,k*.06);tone(f*2,f*2,.08,'sine',.015,k*.06+.02)})}
+  else if(n==='boss'){[110,138.6,164.8].forEach((f,k)=>tone(f,f*.98,1.1,'sawtooth',.045,k*.02));noise(1,300,120,'lowpass',.08);tone(55,45,1.2,'triangle',.12)}
+  else if(n==='win'){[523,659,784,1047,784,1047].forEach((f,k)=>{tone(f,f,.22,'square',.045,k*.14);tone(f/2,f/2,.22,'triangle',.06,k*.14)});noise(.6,8000,3000,'highpass',.03,.7)}
+  else if(n==='pop'){tone(1400,400,.08,'sine',.08);noise(.05,5000,2000,'bandpass',.05,0,3)}
+  else if(n==='boom'){noise(.9,2500,120,'lowpass',.25);tone(120,35,.8,'sine',.2);noise(.4,5000,800,'bandpass',.06,.05,1)}
+  else if(n==='balloon'){noise(.5,3500,250,'lowpass',.2);tone(160,60,.35,'sine',.12);[0,1,2,3,4].forEach(k=>tone(rnd(500,1000),rnd(1300,2000),.05,'sine',.03,.1+k*.05))}
 }
+/* ---------- MUSIC (simple chiptune loop) ---------- */
+const TUNE={lead:[72,null,76,null,79,76,72,null,74,null,77,null,81,77,74,null,76,null,79,null,84,79,76,74,72,74,76,77,79,null,null,null],bass:[48,48,53,53,55,55,48,48]};
+const BOSSTUNE={lead:[69,null,72,null,76,72,69,null,71,null,74,null,77,74,71,null,72,null,76,null,81,76,72,71,69,71,72,74,76,null,76,null],bass:[45,45,50,50,52,52,45,45]};
+let musNext=0,musStep=0;const mf=m=>440*Math.pow(2,(m-69)/12);
+function musicTick(){if(!AC||!MUSBUS||muted||cfg.music===false||!running||paused||!G||G.state==='stats'){musNext=0;return}
+  const now=AC.currentTime;if(musNext<now)musNext=now+.05;const boss=!!G.boss,T=boss?BOSSTUNE:TUNE,spb=60/(boss?152:128)/2;
+  while(musNext<now+.2){const st=musStep%32,t=musNext-AC.currentTime;const n=T.lead[st];
+    if(n!=null)tone(mf(n),mf(n),spb*.9,'square',.035,t,MUSBUS);
+    if(st%4===0){const b=T.bass[(st/4)%8];tone(mf(b),mf(b),spb*3.6,'triangle',.09,t,MUSBUS)}
+    if(st%2===1&&NOISE){const s=AC.createBufferSource();s.buffer=NOISE;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=AC.createGain();
+      g.gain.setValueAtTime(.025,musNext);g.gain.exponentialRampToValueAtTime(.0001,musNext+.04);s.connect(f).connect(g).connect(MUSBUS);s.start(musNext);s.stop(musNext+.05)}
+    if(st%8===0&&NOISE){tone(140,45,.12,'sine',.1,t,MUSBUS)}
+    musNext+=spb;musStep++}}
 
 /* ---------- INPUT ---------- */
 const keys={};
@@ -269,6 +303,7 @@ addEventListener('keydown',e=>{
   if(GAMEKEYS.includes(e.code))e.preventDefault();
   if(e.code==='Escape'||e.code==='KeyP')paused=!paused;
   if(e.code==='KeyM')muted=!muted;
+  if(e.code==='KeyN'){cfg.music=cfg.music===false;save()}
   if(G&&G.state==='stats'&&(e.code==='Enter'||e.code==='Space'||e.code==='NumpadEnter'))statsNext();
   if(!e.repeat){
     if(e.code==='KeyE'||e.code==='KeyQ'||(!cfg.twoPlayer&&(e.code==='ShiftRight'||e.code==='KeyB')))nadeReq[0]=true;
@@ -485,11 +520,11 @@ function throwBalloon(p){
   if(p.balloons<=0){txt(p.x,p.y-50,'No balloons!','#ffd93d',18);return}
   p.balloons--;
   const tx=clamp(p.x+p.dx*200,20,W-20),ty=clamp(p.y-6+p.dy*200,60,H-30);
-  G.lobs.push({sx:p.x,sy:p.y-10,tx,ty,t:0,dur:.7,owner:p.i});{const st=ST(p.i);if(st)st.balloons++}tone(300,700,.25,'sine',.06);
+  sfx('throw');G.lobs.push({sx:p.x,sy:p.y-10,tx,ty,t:0,dur:.7,owner:p.i});{const st=ST(p.i);if(st)st.balloons++}tone(300,700,.25,'sine',.06);
 }
 function explode(x,y){
   G.rings.push({x,y,r:10,life:.45});burst(x,y,'#5ec8ff',36,280);burst(x,y,'#fff',10,160);
-  G.shake=Math.max(G.shake,.45);tone(200,50,.4,'triangle',.14);tone(900,200,.3,'sine',.05,.05);
+  G.shake=Math.max(G.shake,.45);sfx('balloon');
   let n=0;
   for(const e of G.enemies)if(e.state==='walk'&&dist(x,y,e.x,e.y-10)<85){e.hp-=5;e.flash=.15;if(e.hp<=0){splashEnemy(e,n>0);n++}}
   if(n>1)txt(x,y-30,'x'+n+' SPLASH!','#ffd93d',30);
@@ -898,7 +933,7 @@ function updBombs(dt){
     if(after!==before&&after>0)tone(600+(5-after)*150,600+(5-after)*150,.1,'square',.05);
     if(m.fuse<=0){m.gone=true;G.rings.push({x:m.tx,y:m.ty,r:20,life:.45});G.rings.push({x:m.tx,y:m.ty,r:5,life:.3});
       burst(m.tx,m.ty,'#ff9f43',30,300);burst(m.tx,m.ty,'#3db8ff',24,260);burst(m.tx,m.ty,'#ffe66d',14,200);G.shake=.8;
-      tone(160,40,.6,'sawtooth',.13);tone(90,30,.7,'triangle',.12);txt(m.tx,m.ty-40,'BOOM!','#ff9f43',38);
+      sfx('boom');txt(m.tx,m.ty-40,'BOOM!','#ff9f43',38);
       G.hitSrc=m.grenade?'💣 Grenades':'💣 Bombs';for(const p of G.players)if(dist(p.x,p.y+10,m.tx,m.ty)<(m.r||85))hurt(p);G.hitSrc=null}}
   G.bombs=G.bombs.filter(m=>!m.gone);
 }
@@ -949,7 +984,7 @@ function startFoot(b){
   burst(ex,ey,'#ff9f43',50,380);burst(ex,ey,'#ffe66d',30,300);burst(ex,ey,'#ff4d2e',24,260);
   for(let k=0;k<26;k++){const a=Math.random()*7,v=rnd(30,140);G.parts.push({x:ex+rnd(-20,20),y:ey+rnd(-20,20),vx:Math.cos(a)*v,vy:Math.sin(a)*v-30,life:rnd(1,1.8),max:1.8,r:rnd(8,16),col:'rgba(70,70,70,.55)',g:-20})}
   for(let k=0;k<10;k++){const a=Math.random()*7,v=rnd(150,300);G.parts.push({x:ex,y:ey,vx:Math.cos(a)*v,vy:Math.sin(a)*v-120,life:1.2,max:1.2,r:rnd(3,6),col:'#2b2f35',g:420,sq:true})}
-  G.shake=1.4;tone(150,30,.9,'sawtooth',.16);tone(80,25,1,'triangle',.15);tone(300,60,.5,'square',.06,.05);txt(ex,ey-40,'KA-BOOM!','#ff9f43',44);
+  G.shake=1.4;sfx('boom');noise(1.2,1500,90,'lowpass',.2,.1);txt(ex,ey-40,'KA-BOOM!','#ff9f43',44);
   Object.assign(b,{heli:false,foot:true,state:'jump',t:0,t2:0,x:b.x,y:b.y+50,max:Math.round(b.max*.5),rot:0,s:1,walk:0,fx:0,fy:1,moving:true,throwT:1.6,
     tx:clamp(b.x,80,W-80),ty:210,say:2.6,sayText:"You'll never catch me!",sayT:4,flash:0});
   b.hp=b.max;G.banner=3.4;setTimeout(()=>sfx('boss'),900);G.foe=[];
@@ -1702,7 +1737,7 @@ function drawHUD(){
 }
 
 let last=0;
-function loop(ts){const dt=Math.min(.05,(ts-last)/1000||0);last=ts;PADS=pollPads();if(running){if(!paused)update(dt);draw()}requestAnimationFrame(loop)}
+function loop(ts){const dt=Math.min(.05,(ts-last)/1000||0);last=ts;PADS=pollPads();musicTick();if(running){if(!paused)update(dt);draw()}requestAnimationFrame(loop)}
 renderSetup();requestAnimationFrame(loop);
 window.__sw={get G(){return G},cfg,shift:s=>shiftWorld(s)};
 })();
